@@ -8,9 +8,10 @@ import { bytesToSize } from './utils';
 
 function App() {
 	const [file, setFile] = useState(null)
-	const [process, setProcess] = useState(null)
+	const [percentage, setPercentage] = useState(0)
 	const [fileSize, SetFileSize] = useState(null)
 	const [uploadedSize, SetUploadedSize] = useState(null)
+    const [process, setProcess] = useState(false)
 	const [error, setError] = useState(false)
 	const [isCompleted, setCompleted] = useState(false)
 
@@ -26,7 +27,7 @@ function App() {
 		const file = e.target.files[0];
 		if (!file) {
 			setFile(null)
-			setProcess(null)
+			setProcess(false)
 			return;
 		}
 		const target = { Bucket: S3_BUCKET_NAME, Key: file.name, Body: file };
@@ -42,25 +43,31 @@ function App() {
 				s3RetryCount: 3,    // this is the default
     			s3RetryDelay: 1000, // this is the default
 			});
-
+            setProcess(true)
 			parallelUpload.on("httpUploadProgress", (progress) => {
-				console.log('Uploading Info -> ', progress)
-				let percent = Math.floor(progress.loaded / progress.total * 100)
-				setProcess(percent)
-
+				// console.log('Uploading Info -> ', progress)
+				let percent = Math.floor(progress.loaded / progress.total * 100)				
+                
 				SetFileSize(bytesToSize(progress.total))
 				SetUploadedSize(bytesToSize(progress.loaded))
+                setPercentage(percent)
 			});
 
 
 			const response = await parallelUpload.done();
 			if (response.$metadata.httpStatusCode === 200) {
 				setCompleted(true)
-			} else { setError(true) }
+			} else { 
+                setFile(null)
+			    setProcess(false)
+                setError(true) 
+            }
 
 		} catch (e) {
 			console.log(e);
 			setError(true)
+            setFile(null)
+			setProcess(false)
 		}
 	}
 
@@ -76,18 +83,16 @@ function App() {
 				<div className="input-group mb-3 mt-3">
 					<input type="file" className="form-control" onChange={uploadFile} />
 				</div> }
-
 				{process &&
-				<div className="progress mt-3">
-					<div className="progress-bar" role="progressbar" style={{ width: `${process}%` }} aria-valuenow={process} aria-valuemin="0" aria-valuemax="100">{process}%</div>
+				<div className="progress mt-4">
+					<div className="progress-bar" role="progressbar" style={{ width: `${percentage}%` }} aria-valuenow={percentage} aria-valuemin="0" aria-valuemax="100">{percentage}%</div>
 				</div> }
 				
 				{isCompleted &&
 					<div className="alert alert-success mt-4" role="alert">
-						<strong>{file.name}</strong> has been successfully uploaded.
+						<strong>{file.name}</strong> ({fileSize}) has been successfully uploaded.
 					</div>
 				}
-
 				{error &&
 					<div className="alert alert-danger mt-4" role="alert">
 						Something wents wrong... 
