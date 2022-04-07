@@ -2,7 +2,7 @@ import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css'
 import { Upload } from "@aws-sdk/lib-storage";
 import { S3Client } from "@aws-sdk/client-s3";
-import { S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } from './config';
+import { S3_BUCKET_NAME, AWS_S3_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } from './config';
 import { useState } from 'react';
 import { bytesToSize } from './utils';
 
@@ -14,9 +14,11 @@ function App() {
     const [process, setProcess] = useState(false)
 	const [error, setError] = useState(false)
 	const [isCompleted, setCompleted] = useState(false)
+	const [loading, setLoading] = useState(false)
+
 
 	const options = {
-		region: 'ap-south-1',
+		region: AWS_S3_REGION,
 		credentials: {
 			accessKeyId: AWS_ACCESS_KEY_ID,
 			secretAccessKey: AWS_SECRET_ACCESS_KEY
@@ -25,11 +27,13 @@ function App() {
 
 	const uploadFile = async (e) => {
 		const file = e.target.files[0];
+
 		if (!file) {
 			setFile(null)
 			setProcess(false)
 			return;
 		}
+        setLoading(true)
 		const target = { Bucket: S3_BUCKET_NAME, Key: file.name, Body: file };
 
 		try {
@@ -45,12 +49,17 @@ function App() {
 			});
             setProcess(true)
 			parallelUpload.on("httpUploadProgress", (progress) => {
+                setLoading(false)
 				// console.log('Uploading Info -> ', progress)
-				let percent = Math.floor(progress.loaded / progress.total * 100)				
-                
-				SetFileSize(bytesToSize(progress.total))
-				SetUploadedSize(bytesToSize(progress.loaded))
+                const fileSize = bytesToSize(progress.total)
+                let uploadedSize = bytesToSize(progress.loaded)
+                let percent = Math.floor(progress.loaded / progress.total * 100)
+				SetFileSize(fileSize)
+				SetUploadedSize(uploadedSize)
                 setPercentage(percent)
+
+                document.title = `${uploadedSize} of ${fileSize} uploaded (${percent}%)` 
+
 			});
 
 
@@ -75,12 +84,21 @@ function App() {
 		<div className='container'>
 			<div className='mt-5'>
 				{file ?
-					<h5>Uploading: <code>{file.name} ({uploadedSize} / {fileSize})</code></h5>
+                    <>
+                        <center>
+                            {loading ? <img src='/loader.gif' className='mb-5' alt='loading' /> : isCompleted ? <img src='/uploaded.gif' width='160' className='mb-5' alt='completed' /> : <img src='/process.gif' className='mb-5' alt='uploading' /> }
+                        </center>
+                        <h5>Uploading: <code>{file.name}</code> </h5>
+                        {loading ? <p className='text-center'>Please Wait...</p> :  <p className='text-center'>{uploadedSize} / {fileSize}</p> } 
+                    </>
 					:
-					<h3>Select a file to upload</h3>
+                    <>               
+                        <center><img src='/icon.png' className='mb-5' alt='loading' />  </center>       
+					    <h3>Select a file to upload</h3>
+                    </>
 				}
 				{!process &&
-				<div className="input-group mb-3 mt-3">
+				<div className="input-group mb-3 mt-5">
 					<input type="file" className="form-control" onChange={uploadFile} />
 				</div> }
 				{process &&
